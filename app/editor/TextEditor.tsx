@@ -1,6 +1,6 @@
 'use client'
 
-import { useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import './editor.css'
 
 export default function TextEditor() {
@@ -17,6 +17,7 @@ export default function TextEditor() {
   const [activeColorIndex, setActiveColorIndex] = useState<number | null>(null)
   const [cCounter, setCCounter] = useState(1)
   const [iCounter, setICounter] = useState(1)
+  const [sCounter, setSCounter] = useState(0)
   const [justInsertedSnippet, setJustInsertedSnippet] = useState(false)
   const [activeFormats, setActiveFormats] = useState({
     bold: false,
@@ -26,6 +27,27 @@ export default function TextEditor() {
     insertUnorderedList: false,
     insertOrderedList: false
   })
+
+  useEffect(() => {
+    const editor = editorRef.current
+    if (!editor) return
+
+    editor.focus()
+    const vSpan = Array.from(editor.querySelectorAll('span')).find((span) =>
+      (span.textContent ?? '').trim().startsWith('V:')
+    )
+
+    if (vSpan) {
+      const range = document.createRange()
+      range.selectNodeContents(vSpan)
+      range.collapse(false)
+      const selection = window.getSelection()
+      if (selection) {
+        selection.removeAllRanges()
+        selection.addRange(range)
+      }
+    }
+  }, [])
 
   const updateActiveFormats = () => {
     setActiveFormats({
@@ -77,6 +99,12 @@ export default function TextEditor() {
     }
   }
 
+  const getLetterSequence = (index: number) => {
+    const safeIndex = Math.max(0, index)
+    const letterIndex = safeIndex % 26
+    return String.fromCharCode(65 + letterIndex)
+  }
+
   const insertSnippet = (text: string) => {
     editorRef.current?.focus()
     
@@ -96,33 +124,83 @@ export default function TextEditor() {
       // Check if there's any text content in the current block
       const textContent = (currentNode as HTMLElement).textContent || ''
       hasTextOnLine = textContent.trim().length > 0
-      
-      // If there's text, insert a line break first
-      if (hasTextOnLine) {
-        const br = document.createElement('br')
-        range.insertNode(br)
-        range.setStartAfter(br)
-        range.setEndAfter(br)
-      }
-      
+
       // Create and insert the formatted snippet
       const span = document.createElement('span')
       span.style.fontWeight = 'bold'
       span.style.fontSize = '20pt'
-      span.textContent = text
-      
+      span.textContent = `${text.replace(/\s*$/, '')}\u00A0`
+
       range.deleteContents()
-      range.insertNode(span)
-      
+
+      if (hasTextOnLine) {
+        const p = document.createElement('p')
+        p.style.marginTop = '18px'
+        p.style.marginBottom = '12px'
+        p.appendChild(span)
+        range.insertNode(p)
+
+        range.setStartAfter(p)
+        range.setEndAfter(p)
+      } else {
+        range.insertNode(span)
+        range.setStartAfter(span)
+        range.setEndAfter(span)
+      }
+
       // Move cursor after the inserted text
-      range.setStartAfter(span)
-      range.setEndAfter(span)
       selection.removeAllRanges()
       selection.addRange(range)
     }
     
     setJustInsertedSnippet(true)
     editorRef.current?.focus()
+  }
+
+  const insertCleanLine = (newParagraph: boolean) => {
+    const selection = window.getSelection()
+    if (!selection || selection.rangeCount === 0) return
+
+    const range = selection.getRangeAt(0)
+    range.deleteContents()
+
+    if (newParagraph) {
+      const p = document.createElement('p')
+      p.style.fontWeight = 'normal'
+      p.style.textDecoration = 'none'
+      p.style.fontStyle = 'normal'
+      p.style.fontSize = '15pt'
+      p.style.marginTop = '18px'
+      p.style.marginBottom = '12px'
+      p.innerHTML = '&nbsp;'
+      range.insertNode(p)
+
+      range.setStart(p, 0)
+      range.setEnd(p, 0)
+    } else {
+      const br = document.createElement('br')
+      range.insertNode(br)
+
+      const span = document.createElement('span')
+      span.style.fontWeight = 'normal'
+      span.style.textDecoration = 'none'
+      span.style.fontStyle = 'normal'
+      span.style.fontSize = '15pt'
+      span.innerHTML = '&nbsp;'
+
+      range.setStartAfter(br)
+      range.insertNode(span)
+      range.setStart(span.firstChild!, 1)
+      range.collapse(true)
+    }
+
+    selection.removeAllRanges()
+    selection.addRange(range)
+
+    setTimeout(() => {
+      document.execCommand('removeFormat', false, '')
+      document.execCommand('formatBlock', false, '<p>')
+    }, 0)
   }
 
   const changeFontSizeBy = (delta: number) => {
@@ -201,38 +279,16 @@ export default function TextEditor() {
 
       e.preventDefault()
 
-      if (selection && selection.rangeCount > 0) {
-        const range = selection.getRangeAt(0)
-        range.deleteContents()
-        
-        // Insert a line break
-        const br = document.createElement('br')
-        range.insertNode(br)
-        
-        // Create a new span with explicitly cleared formatting
-        const span = document.createElement('span')
-        span.style.fontWeight = 'normal'
-        span.style.textDecoration = 'none'
-        span.style.fontStyle = 'normal'
-        span.style.fontSize = '15pt'
-        span.innerHTML = '&nbsp;'
-        
-        range.setStartAfter(br)
-        range.insertNode(span)
-        
-        // Move cursor into the span and collapse to start
-        range.setStart(span.firstChild!, 1)
-        range.collapse(true)
-        selection.removeAllRanges()
-        selection.addRange(range)
-        
-        // Force remove any active formatting commands
-        setTimeout(() => {
-          document.execCommand('removeFormat', false, '')
-          document.execCommand('formatBlock', false, '<p>')
-        }, 0)
-      }
+      insertCleanLine(true)
       
+      setJustInsertedSnippet(false)
+      editorRef.current?.focus()
+      return
+    }
+
+    if (e.key === 'Enter') {
+      e.preventDefault()
+      insertCleanLine(false)
       setJustInsertedSnippet(false)
       editorRef.current?.focus()
       return
@@ -500,6 +556,16 @@ export default function TextEditor() {
               C
             </button>
             <button
+              title="Insert S(letter):"
+              onClick={() => {
+                insertSnippet(`S${getLetterSequence(sCounter)}: `)
+                setSCounter(prev => prev + 1)
+              }}
+              className="toolbar-btn"
+            >
+              S
+            </button>
+            <button
               title="Insert I#:"
               onClick={() => {
                 insertSnippet(`I${iCounter}: `)
@@ -523,8 +589,8 @@ export default function TextEditor() {
           onKeyDown={handleKeyDown}
           style={{ zoom: `${zoomLevel}%` }}
         >
-          <p><span style={{ fontWeight: 'bold', fontSize: '20pt' }}>V: </span></p>
-          <p><span style={{ fontWeight: 'bold', fontSize: '20pt' }}>VC: </span></p>
+          <p><span style={{ fontWeight: 'bold', fontSize: '20pt' }}>V:&nbsp;</span></p>
+          <p><span style={{ fontWeight: 'bold', fontSize: '20pt' }}>VC:&nbsp;</span></p>
         </div>
 
         <div className="color-panel">
