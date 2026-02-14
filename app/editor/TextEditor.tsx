@@ -249,12 +249,15 @@ export default function TextEditor() {
   }
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
+    // Determine which editor is focused
+    const focusedEditor = (e.currentTarget as HTMLElement) === editorRef.current ? editorRef : secondEditorRef
+    
     // Handle Tab key - create new line with all formatting removed
     if (e.key === 'Tab') {
       const selection = window.getSelection()
       if (selection && selection.rangeCount > 0) {
         const range = selection.getRangeAt(0)
-        const editorRoot = editorRef.current
+        const editorRoot = focusedEditor.current
         if (editorRoot) {
           const currentBlock = getBlockElement(range.startContainer, editorRoot)
           if (currentBlock) {
@@ -271,7 +274,7 @@ export default function TextEditor() {
                 newRange.collapse(false)
                 selection.removeAllRanges()
                 selection.addRange(newRange)
-                editorRef.current?.focus()
+                focusedEditor.current?.focus()
                 return
               }
             }
@@ -284,7 +287,7 @@ export default function TextEditor() {
       insertCleanLine(true)
       
       setJustInsertedSnippet(false)
-      editorRef.current?.focus()
+      focusedEditor.current?.focus()
       return
     }
 
@@ -292,7 +295,7 @@ export default function TextEditor() {
       e.preventDefault()
       insertCleanLine(false)
       setJustInsertedSnippet(false)
-      editorRef.current?.focus()
+      focusedEditor.current?.focus()
       return
     }
     
@@ -318,6 +321,7 @@ export default function TextEditor() {
         if (e.key === ']') {
           e.preventDefault()
           setIsSplitOpen(true)
+          setTimeout(() => secondEditorRef.current?.focus(), 0)
         } else if (e.key === '[') {
           e.preventDefault()
           setIsSplitOpen(false)
