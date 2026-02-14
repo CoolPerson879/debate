@@ -154,12 +154,53 @@ export default function TextEditor() {
     editorRef.current?.focus()
   }
 
+  const getBlockElement = (node: Node, root: HTMLElement) => {
+    let current: Node | null = node
+    while (current && current !== root) {
+      if (current instanceof HTMLElement) {
+        const tagName = current.tagName
+        if (tagName === 'P' || tagName === 'DIV' || tagName === 'LI') {
+          return current
+        }
+      }
+      current = current.parentNode
+    }
+    return null
+  }
+
   const handleKeyDown = (e: React.KeyboardEvent) => {
     // Handle Tab key - create new line with all formatting removed
     if (e.key === 'Tab') {
-      e.preventDefault()
-      
       const selection = window.getSelection()
+      if (selection && selection.rangeCount > 0) {
+        const range = selection.getRangeAt(0)
+        const editorRoot = editorRef.current
+        if (editorRoot) {
+          const currentBlock = getBlockElement(range.startContainer, editorRoot)
+          if (currentBlock) {
+            const currentText = currentBlock.textContent?.trim() ?? ''
+            if (currentText.startsWith('V:')) {
+              let nextBlock = currentBlock.nextElementSibling as HTMLElement | null
+              while (nextBlock && (nextBlock.textContent ?? '').trim().length === 0) {
+                nextBlock = nextBlock.nextElementSibling as HTMLElement | null
+              }
+              if (nextBlock && (nextBlock.textContent ?? '').trim().startsWith('VC:')) {
+                e.preventDefault()
+                const newRange = document.createRange()
+                newRange.selectNodeContents(nextBlock)
+                newRange.collapse(false)
+                selection.removeAllRanges()
+                selection.addRange(newRange)
+                editorRef.current?.focus()
+                return
+              }
+            }
+          }
+        }
+      }
+
+      e.preventDefault()
+
       if (selection && selection.rangeCount > 0) {
         const range = selection.getRangeAt(0)
         range.deleteContents()
@@ -482,8 +523,8 @@ export default function TextEditor() {
           onKeyDown={handleKeyDown}
           style={{ zoom: `${zoomLevel}%` }}
         >
-          <h1>Welcome to Your Text Editor</h1>
-          <p>Start typing to create your document...</p>
+          <p><span style={{ fontWeight: 'bold', fontSize: '20pt' }}>V: </span></p>
+          <p><span style={{ fontWeight: 'bold', fontSize: '20pt' }}>VC: </span></p>
         </div>
 
         <div className="color-panel">
