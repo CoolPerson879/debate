@@ -15,6 +15,9 @@ export default function TextEditor() {
   const [dropPosition, setDropPosition] = useState<number | null>(null)
   const [zoomLevel, setZoomLevel] = useState(100)
   const [activeColorIndex, setActiveColorIndex] = useState<number | null>(null)
+  const [cCounter, setCCounter] = useState(1)
+  const [iCounter, setICounter] = useState(1)
+  const [justInsertedSnippet, setJustInsertedSnippet] = useState(false)
   const [activeFormats, setActiveFormats] = useState({
     bold: false,
     italic: false,
@@ -74,6 +77,54 @@ export default function TextEditor() {
     }
   }
 
+  const insertSnippet = (text: string) => {
+    editorRef.current?.focus()
+    
+    const selection = window.getSelection()
+    if (selection && selection.rangeCount > 0) {
+      const range = selection.getRangeAt(0)
+      
+      // Check if there's already text on the current line
+      let currentNode = range.startContainer
+      let hasTextOnLine = false
+      
+      // Navigate to parent element to check for content
+      if (currentNode.nodeType === Node.TEXT_NODE) {
+        currentNode = currentNode.parentNode as Node
+      }
+      
+      // Check if there's any text content in the current block
+      const textContent = (currentNode as HTMLElement).textContent || ''
+      hasTextOnLine = textContent.trim().length > 0
+      
+      // If there's text, insert a line break first
+      if (hasTextOnLine) {
+        const br = document.createElement('br')
+        range.insertNode(br)
+        range.setStartAfter(br)
+        range.setEndAfter(br)
+      }
+      
+      // Create and insert the formatted snippet
+      const span = document.createElement('span')
+      span.style.fontWeight = 'bold'
+      span.style.fontSize = '20pt'
+      span.textContent = text
+      
+      range.deleteContents()
+      range.insertNode(span)
+      
+      // Move cursor after the inserted text
+      range.setStartAfter(span)
+      range.setEndAfter(span)
+      selection.removeAllRanges()
+      selection.addRange(range)
+    }
+    
+    setJustInsertedSnippet(true)
+    editorRef.current?.focus()
+  }
+
   const changeFontSizeBy = (delta: number) => {
     const selection = window.getSelection()
     if (!selection || selection.rangeCount === 0) return
@@ -104,6 +155,48 @@ export default function TextEditor() {
   }
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
+    // Handle Tab key - create new line with all formatting removed
+    if (e.key === 'Tab') {
+      e.preventDefault()
+      
+      const selection = window.getSelection()
+      if (selection && selection.rangeCount > 0) {
+        const range = selection.getRangeAt(0)
+        range.deleteContents()
+        
+        // Insert a line break
+        const br = document.createElement('br')
+        range.insertNode(br)
+        
+        // Create a new span with explicitly cleared formatting
+        const span = document.createElement('span')
+        span.style.fontWeight = 'normal'
+        span.style.textDecoration = 'none'
+        span.style.fontStyle = 'normal'
+        span.style.fontSize = '15pt'
+        span.innerHTML = '&nbsp;'
+        
+        range.setStartAfter(br)
+        range.insertNode(span)
+        
+        // Move cursor into the span and collapse to start
+        range.setStart(span.firstChild!, 1)
+        range.collapse(true)
+        selection.removeAllRanges()
+        selection.addRange(range)
+        
+        // Force remove any active formatting commands
+        setTimeout(() => {
+          document.execCommand('removeFormat', false, '')
+          document.execCommand('formatBlock', false, '<p>')
+        }, 0)
+      }
+      
+      setJustInsertedSnippet(false)
+      editorRef.current?.focus()
+      return
+    }
+    
     // Check for Ctrl (Windows/Linux) or Cmd (Mac)
     if (e.ctrlKey || e.metaKey) {
       if (e.shiftKey) {
@@ -335,6 +428,45 @@ export default function TextEditor() {
               className={`toolbar-btn ${activeFormats.insertOrderedList ? 'active' : ''}`}
             >
               ≡
+            </button>
+          </div>
+
+          <div className="toolbar-divider"></div>
+
+          <div className="toolbar-group">
+            <button
+              title="Insert V:"
+              onClick={() => insertSnippet('V: ')}
+              className="toolbar-btn"
+            >
+              V
+            </button>
+            <button
+              title="Insert VC:"
+              onClick={() => insertSnippet('VC: ')}
+              className="toolbar-btn"
+            >
+              VC
+            </button>
+            <button
+              title="Insert C#:"
+              onClick={() => {
+                insertSnippet(`C${cCounter}: `)
+                setCCounter(prev => prev + 1)
+              }}
+              className="toolbar-btn"
+            >
+              C
+            </button>
+            <button
+              title="Insert I#:"
+              onClick={() => {
+                insertSnippet(`I${iCounter}: `)
+                setICounter(prev => prev + 1)
+              }}
+              className="toolbar-btn"
+            >
+              I
             </button>
           </div>
         </div>
