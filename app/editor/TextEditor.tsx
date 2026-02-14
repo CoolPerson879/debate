@@ -5,6 +5,7 @@ import './editor.css'
 
 export default function TextEditor() {
   const editorRef = useRef<HTMLDivElement>(null)
+  const secondEditorRef = useRef<HTMLDivElement>(null)
   const colorInputRef = useRef<HTMLInputElement>(null)
   const holdTimeoutRef = useRef<NodeJS.Timeout | null>(null)
   const [fontFamily, setFontFamily] = useState('Arial')
@@ -14,6 +15,7 @@ export default function TextEditor() {
   const [draggedIndex, setDraggedIndex] = useState<number | null>(null)
   const [dropPosition, setDropPosition] = useState<number | null>(null)
   const [zoomLevel, setZoomLevel] = useState(100)
+  const [isSplitOpen, setIsSplitOpen] = useState(false)
   const [activeColorIndex, setActiveColorIndex] = useState<number | null>(null)
   const [cCounter, setCCounter] = useState(1)
   const [iCounter, setICounter] = useState(1)
@@ -313,7 +315,13 @@ export default function TextEditor() {
         }
       } else {
         // Regular Ctrl/Cmd combinations
-        if (e.key === 'b') {
+        if (e.key === ']') {
+          e.preventDefault()
+          setIsSplitOpen(true)
+        } else if (e.key === '[') {
+          e.preventDefault()
+          setIsSplitOpen(false)
+        } else if (e.key === 'b') {
           e.preventDefault()
           applyStyle('bold')
         } else if (e.key === 'i') {
@@ -532,6 +540,18 @@ export default function TextEditor() {
 
           <div className="toolbar-group">
             <button
+              title="Split screen"
+              onClick={() => setIsSplitOpen(prev => !prev)}
+              className={`toolbar-btn ${isSplitOpen ? 'active' : ''}`}
+            >
+              Split
+            </button>
+          </div>
+
+          <div className="toolbar-divider"></div>
+
+          <div className="toolbar-group">
+            <button
               title="Insert V:"
               onClick={() => insertSnippet('V: ')}
               className="toolbar-btn"
@@ -578,19 +598,37 @@ export default function TextEditor() {
           </div>
         </div>
 
-        <div
-          ref={editorRef}
-          contentEditable
-          className="editor-content"
-          suppressContentEditableWarning
-          onInput={updateActiveFormats}
-          onMouseUp={updateActiveFormats}
-          onKeyUp={updateActiveFormats}
-          onKeyDown={handleKeyDown}
-          style={{ zoom: `${zoomLevel}%` }}
-        >
-          <p><span style={{ fontWeight: 'bold', fontSize: '20pt' }}>V:&nbsp;</span></p>
-          <p><span style={{ fontWeight: 'bold', fontSize: '20pt' }}>VC:&nbsp;</span></p>
+        <div className="editor-split">
+          <div className="editor-pane">
+            <div
+              ref={editorRef}
+              contentEditable
+              className="editor-content"
+              suppressContentEditableWarning
+              onInput={updateActiveFormats}
+              onMouseUp={updateActiveFormats}
+              onKeyUp={updateActiveFormats}
+              onKeyDown={handleKeyDown}
+              style={{ zoom: `${zoomLevel}%` }}
+            >
+              <p><span style={{ fontWeight: 'bold', fontSize: '20pt' }}>V:&nbsp;</span></p>
+              <p><span style={{ fontWeight: 'bold', fontSize: '20pt' }}>VC:&nbsp;</span></p>
+            </div>
+          </div>
+          <div className={`split-divider ${isSplitOpen ? '' : 'is-hidden'}`}></div>
+          <div className={`editor-pane ${isSplitOpen ? '' : 'is-hidden'}`}>
+            <div
+              ref={secondEditorRef}
+              contentEditable
+              className="editor-content"
+              suppressContentEditableWarning
+              onInput={updateActiveFormats}
+              onMouseUp={updateActiveFormats}
+              onKeyUp={updateActiveFormats}
+              onKeyDown={handleKeyDown}
+              style={{ zoom: `${zoomLevel}%` }}
+            ></div>
+          </div>
         </div>
 
         <div className="color-panel">
